@@ -14,12 +14,20 @@ public class Network_UI_Manager : MonoBehaviour
 {
     public static Network_UI_Manager instance { get; private set; }
 
+
+    [Header("UI Elements")]
     public TMP_InputField serverNameInput;
     public TMP_InputField serverCodeInput;
     public TMP_InputField emailInput;
     public TMP_InputField usernameInput;
     public TMP_InputField passwordInput;
     public TextMeshProUGUI statusText;
+    public GameObject LobbyUI = null;
+
+    [Header("Player Setup")]
+    public GameObject playerPrefab;  // Prefab dla gracza
+    public Transform gridTransform;  // Transform gridu
+
     private string serverCode;
 
     private async void Awake()
@@ -46,6 +54,9 @@ public class Network_UI_Manager : MonoBehaviour
             {
                 statusText.text = "Signed out successfully.";
             };
+
+            // Attempt automatic login
+            await TryAutoLogin();
         }
         else
         {
@@ -84,6 +95,13 @@ public class Network_UI_Manager : MonoBehaviour
         }
     }
 
+    public void Disconnect()
+    {
+        NetworkManager.Singleton.Shutdown();
+        LobbyUI.SetActive(false);
+    }
+
+
     private async Task<bool> CreateUserOnCustomBackend(string email, string username, string password)
     {
         // Implement your custom backend logic here to create the user
@@ -107,10 +125,42 @@ public class Network_UI_Manager : MonoBehaviour
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
             statusText.text = "Signed in successfully.";
+
+            // Save credentials (or token)
+            PlayerPrefs.SetString("username", username);
+            PlayerPrefs.SetString("password", password);  // Consider encrypting password before saving
+            PlayerPrefs.Save();
         }
         catch (Exception e)
         {
             statusText.text = $"Sign-in failed: {e.Message}";
+        }
+    }
+
+    public void SignOut()
+    {
+        AuthenticationService.Instance.SignOut();
+        PlayerPrefs.DeleteKey("username");
+        PlayerPrefs.DeleteKey("password");
+        PlayerPrefs.Save();
+    }
+
+    private async Task TryAutoLogin()
+    {
+        string savedUsername = PlayerPrefs.GetString("username", null);
+        string savedPassword = PlayerPrefs.GetString("password", null);
+
+        if (!string.IsNullOrEmpty(savedUsername) && !string.IsNullOrEmpty(savedPassword))
+        {
+            try
+            {
+                await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                statusText.text = "Auto signed in successfully.";
+            }
+            catch (Exception e)
+            {
+                statusText.text = $"Auto sign-in failed: {e.Message}";
+            }
         }
     }
 
@@ -182,6 +232,7 @@ public class Network_UI_Manager : MonoBehaviour
         if (NetworkManager.Singleton.IsHost)
         {
             statusText.text += "\nClient connected: " + clientId;
+            SpawnPlayer(clientId);
         }
         else
         {
@@ -200,4 +251,23 @@ public class Network_UI_Manager : MonoBehaviour
             statusText.text = "Disconnected from server.";
         }
     }
+
+    public void ShowUI()
+    {
+        LobbyUI.SetActive(true);
+    }
+
+
+    private void SpawnPlayer(ulong clientId)
+    {
+        GameObject playerObject = Instantiate(playerPrefab);
+        playerObject.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId);
+
+        // Jeśli mamy transform gridu, ustawiamy go jako rodzica dla gracza
+        if (gridTransform != null)
+        {
+            playerObject.transform.SetParent(gridTransform);
+        }
+    }
+
 }
