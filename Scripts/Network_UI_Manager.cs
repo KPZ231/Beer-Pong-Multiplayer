@@ -14,7 +14,6 @@ public class Network_UI_Manager : MonoBehaviour
 {
     public static Network_UI_Manager instance { get; private set; }
 
-
     [Header("UI Elements")]
     public TMP_InputField serverNameInput;
     public TMP_InputField serverCodeInput;
@@ -28,6 +27,8 @@ public class Network_UI_Manager : MonoBehaviour
     public GameObject playerPrefab;  // Prefab dla gracza
     public Transform gridTransform;  // Transform gridu
 
+    public bool isPrivateSession = true; // Zmienna do określania rodzaju sesji
+    private const int maxPlayers = 5; // Maksymalna liczba graczy
     private string serverCode;
 
     private async void Awake()
@@ -68,6 +69,7 @@ public class Network_UI_Manager : MonoBehaviour
     {
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
     }
 
     public async void CreateUser()
@@ -100,7 +102,6 @@ public class Network_UI_Manager : MonoBehaviour
         NetworkManager.Singleton.Shutdown();
         LobbyUI.SetActive(false);
     }
-
 
     private async Task<bool> CreateUserOnCustomBackend(string email, string username, string password)
     {
@@ -181,7 +182,7 @@ public class Network_UI_Manager : MonoBehaviour
 
         try
         {
-            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(4);
+            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxPlayers - 1);
             serverCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
 
             var relayServerData = new RelayServerData(allocation, "dtls");
@@ -252,11 +253,24 @@ public class Network_UI_Manager : MonoBehaviour
         }
     }
 
+    private void ApprovalCheck(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
+    {
+        if (NetworkManager.Singleton.ConnectedClients.Count >= maxPlayers)
+        {
+            response.Approved = false;
+            response.Reason = "Server is full.";
+            statusText.text = "Connection attempt rejected: Server is full.";
+        }
+        else
+        {
+            response.Approved = true;
+        }
+    }
+
     public void ShowUI()
     {
         LobbyUI.SetActive(true);
     }
-
 
     private void SpawnPlayer(ulong clientId)
     {
@@ -270,4 +284,17 @@ public class Network_UI_Manager : MonoBehaviour
         }
     }
 
+    public void OnReadyButtonClicked()
+    {
+        var localPlayerObject = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
+        if (localPlayerObject != null)
+        {
+            var playerState = localPlayerObject.GetComponent<Player_State>();
+            if (playerState != null && playerState.IsOwner)
+            {
+                playerState.SetReadyServerRpc();
+                statusText.text = "You are ready!";
+            }
+        }
+    }
 }
