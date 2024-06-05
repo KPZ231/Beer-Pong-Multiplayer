@@ -21,12 +21,13 @@ public class Network_UI_Manager : MonoBehaviour
     public TMP_InputField usernameInput;
     public TMP_InputField passwordInput;
     public TextMeshProUGUI statusText;
+    public TextMeshProUGUI lobbyNameText; // Dodany element do wyświetlania nazwy lobby
     public GameObject LobbyUI = null;
 
     [Header("Player Setup")]
     public GameObject playerPrefab;  // Prefab dla gracza
     public Transform gridTransform;  // Transform gridu
-
+    public string lobbyName = String.Empty;
     public bool isPrivateSession = true; // Zmienna do określania rodzaju sesji
     private const int maxPlayers = 5; // Maksymalna liczba graczy
     private string serverCode;
@@ -190,6 +191,10 @@ public class Network_UI_Manager : MonoBehaviour
 
             NetworkManager.Singleton.StartHost();
             statusText.text = $"Server '{serverName}' created with code: {serverCode}";
+
+            lobbyName = serverName;
+            lobbyNameText.text = $"{lobbyName} lobby"; // Ustawienie nazwy lobby na elemencie interfejsu
+            Debug.Log("Server created with lobby name: " + lobbyName);
         }
         catch (Exception e)
         {
@@ -208,7 +213,7 @@ public class Network_UI_Manager : MonoBehaviour
 
         if (!AuthenticationService.Instance.IsSignedIn)
         {
-            statusText.text = "You need to sign in first.";
+            statusText.text = statusText.text = "You need to sign in first.";
             return;
         }
 
@@ -298,3 +303,4 @@ public class Network_UI_Manager : MonoBehaviour
         }
     }
 }
+
